@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: gotcha
+      POSTGRES_USER: gotcha
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gotcha -d gotcha"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  app:
+    build: .
+    ports: ["8082:8082"]
+    environment:
+      APP_ENV: development
+      PORT: 8082
+      DATABASE_URL: postgres://gotcha:${POSTGRES_PASSWORD}@postgres:5432/gotcha?sslmode=disable
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}
+      ALLOWED_ORIGINS: http://localhost:8082
+    depends_on:
+      postgres:
+        condition: service_healthy
+volumes:
+  postgres-data:
