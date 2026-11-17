@@ -107,6 +107,28 @@ in minimal environments.
 - `VerifyCode(string, string) (bool, int64, error)` verifies an answer.
 - `ParseAppearance([]string, string) Appearance` validates presentation options.
 
+## LLM setup prompt
+
+Copy this prompt into your coding assistant to integrate Gotcha into another
+Go project:
+
+```text
+Integrate github.com/ravikumariitk/gotcha into this Go project as a human-readable motion CAPTCHA.
+
+Requirements:
+1. Add the dependency with: go get github.com/ravikumariitk/gotcha
+2. Configure the signing secret once at application startup using an environment variable named GOTCHA_SECRET. Never hard-code the secret and never expose it to the browser.
+3. Add a GET /challenge endpoint that creates a challenge with gotcha.NewChallenge(5, "standard", gotcha.ParseAppearance([]string{"#0ea5e9", "#f8fafc"}, "noise")) and returns the challenge as JSON.
+4. Add a POST /verify endpoint that accepts {"token":"...", "answer":"..."}, calls gotcha.VerifyCode, and returns a JSON success result. Return an appropriate client error for invalid, expired, replayed, or incorrect challenges.
+5. Build the frontend so it renders challenge.motion.video as a base64 data URL when available, uses challenge.motion.poster as the poster, and falls back to cycling through challenge.motion.frames when video is unavailable.
+6. Keep the challenge token in memory or in a protected form field. Do not display it, log it, or return the answer code.
+7. Match the project's existing router, error handling, templates, API conventions, and tests. Do not introduce a new web framework.
+8. Add tests covering challenge creation, successful verification, incorrect answers, expired or invalid tokens, and replay protection.
+9. Run gofmt, go test ./..., go test -race ./..., and go vet ./... after the integration.
+
+First inspect the existing project structure and explain which files you will change. Then implement the integration and show the final request/response shape for both endpoints.
+```
+
 Run the checks locally with:
 
 ```bash
