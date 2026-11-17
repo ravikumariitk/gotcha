@@ -1,4 +1,4 @@
-package checkhuman
+package gotcha
 
 import (
 	"fmt"

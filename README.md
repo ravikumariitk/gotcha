@@ -37,6 +37,29 @@ func main() {
 `NewChallenge` never returns the answer code. The frontend displays the motion
 media and submits the signed token with the user's answer to your backend.
 
+## Full login flow
+
+The repository includes a runnable login flow in `examples/login`. It serves a
+page, creates a challenge, keeps the token in browser memory, renders either
+MP4 or animated PNG frames, and submits the token with the user's answer.
+
+Run it with a production-style secret:
+
+```bash
+GOTCHA_SECRET="$(openssl rand -hex 32)" go run ./examples/login
+```
+
+Open <http://localhost:8080>. The example has three steps:
+
+1. `GET /challenge` returns the token, expiry, poster, and motion media. The
+   answer code is never returned.
+2. The browser keeps `challenge.token` client-side and displays the media.
+3. `POST /verify` sends `{"token":"...", "answer":"..."}` to the backend.
+
+The demo is intentionally only the CAPTCHA portion of login. After successful
+verification, connect the success branch to your own user lookup, password
+check, session creation, or other authentication flow.
+
 ## Render the media in a browser
 
 Return the challenge as JSON from your backend. The media fields are base64
@@ -98,6 +121,18 @@ through them:
 The renderer uses `ffmpeg` when available to produce MP4 output. If `ffmpeg`
 is unavailable, it returns PNG frames instead, so the library remains usable
 in minimal environments.
+
+## Security and lifecycle
+
+- Never return or expose the answer code.
+- Never log the token or the user's answer.
+- Keep the token in memory or in a protected form field on the client.
+- Tokens expire after three minutes.
+- Tokens are single-use and rejected after successful verification.
+- A challenge is invalidated after five failed attempts.
+- Always configure `GOTCHA_SECRET` in production with a long, random value.
+- If no secret is configured, Gotcha uses a development-only fallback secret;
+  never rely on that fallback in production.
 
 ## API
 

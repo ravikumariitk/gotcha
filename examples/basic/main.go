@@ -9,10 +9,10 @@ import (
 )
 
 func main() {
-	checkhuman.ConfigureSecret("replace-with-a-secure-secret")
+	gotcha.ConfigureSecret("replace-with-a-secure-secret")
 
 	http.HandleFunc("/challenge", func(w http.ResponseWriter, r *http.Request) {
-		challenge := checkhuman.NewChallenge(5, "standard", checkhuman.ParseAppearance([]string{"#0ea5e9", "#f8fafc"}, "noise"))
+		challenge := gotcha.NewChallenge(5, "standard", gotcha.ParseAppearance([]string{"#0ea5e9", "#f8fafc"}, "noise"))
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
@@ -37,7 +37,7 @@ func main() {
 			return
 		}
 
-		valid, latency, err := checkhuman.VerifyCode(req.Token, req.Answer)
+		valid, latency, err := gotcha.VerifyCode(req.Token, req.Answer)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
