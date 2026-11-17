@@ -143,6 +143,52 @@ in minimal environments.
 - `VerifyCode(string, string) (bool, int64, error)` verifies an answer.
 - `ParseAppearance([]string, string) Appearance` validates presentation options.
 
+## AI and crawler resistance
+
+Gotcha is designed to make automated reading and replay harder, but it is not
+an AI-proof boundary. A capable vision model or browser agent may eventually
+read a motion challenge, especially if it can observe multiple frames or make
+multiple attempts. Do not describe Gotcha as “unreadable by AI” or use it as
+your only defense against credential stuffing, scraping, or abuse.
+
+Use it as one layer alongside authentication, rate limits, request throttling,
+account lockout or step-up verification, origin checks, monitoring, and
+server-side authorization. The signed token, expiration, single-use rule, and
+attempt limit protect the challenge protocol; they do not prove that the
+person solving it is human.
+
+Research has shown that modern vision-language and agentic models can solve
+some visual CAPTCHA families, so CAPTCHA resistance should be tested against
+your own threat model and refreshed as attackers change. See the [USENIX
+Security 2025 research on generalized visual CAPTCHA solving](https://www.usenix.org/conference/usenixsecurity25/presentation/teoh)
+and [USENIX Security 2026 research on multimodal LLM CAPTCHA
+solvers](https://www.usenix.org/conference/usenixsecurity26/presentation/wang-junyu).
+
+## Gotcha vs Google reCAPTCHA
+
+These systems solve different problems and neither is universally “more
+breakable with LLMs”:
+
+| | Gotcha | Google reCAPTCHA |
+|---|---|---|
+| Primary model | Self-hosted motion challenge with a signed answer token | Google-managed risk analysis, with v2 challenges and v3/Enterprise scoring options |
+| AI/crawler exposure | The visible motion challenge can be analyzed by vision models or browser agents | v2 visual challenges can also be automated or outsourced; v3 is primarily a behavioral risk score rather than a puzzle for an LLM to read |
+| Operational strength | Simple, predictable, private, and easy to run without a third-party service | More mature abuse signals, reputation data, analytics, and adaptive enforcement, but it requires Google integration and sends verification traffic to Google |
+| Best fit | Developers who need a controllable, self-hosted CAPTCHA layer | Sites that want a managed abuse-detection service and can accept its operational and privacy trade-offs |
+
+Google describes reCAPTCHA v3 as returning a score based on interaction
+context, and recommends combining low scores with actions such as two-factor
+authentication or email verification rather than treating the score as a
+standalone login decision. See [Google’s reCAPTCHA v3
+documentation](https://developers.google.com/recaptcha/docs/v3) and [guide to
+choosing reCAPTCHA versions](https://developers.google.com/recaptcha/docs/versions).
+
+In short: Gotcha's motion puzzle is not inherently stronger than Google’s
+managed risk system against determined automation. Its advantages are
+self-hosting, transparency, and control. For high-risk login or transaction
+flows, combine either solution with rate limiting, device/session signals,
+MFA or step-up verification, and server-side authentication controls.
+
 ## LLM setup prompt
 
 Copy this prompt into your coding assistant to integrate Gotcha into another
