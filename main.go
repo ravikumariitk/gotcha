@@ -1,6 +1,6 @@
 package checkhuman
 
-import "github.com/ravikumariitk/gotcha/pkg/engine"
+import "github.com/ravikumariitk/gotcha/internal/engine"
 
 // Appearance controls the colors and texture used by a rendered challenge.
 // Use ParseAppearance to build one from CSS-style hex colors.
