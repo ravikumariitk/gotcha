@@ -161,15 +161,15 @@ func ParseAppearance(colors []string, texture string) Appearance {
 }
 
 const (
-	// Compact captcha widget: digits stay centered while noise slides.
-	captchaWidth    = 960
-	captchaHeight   = 400
+	// Compact captcha widget. Glyphs stay centered; only the grain slides.
+	captchaWidth    = 480
+	captchaHeight   = 160
 	captchaGrain    = 2
 	captchaFPS      = 30
 	captchaDuration = 5.0
-	captchaSpeed    = 0.45
+	captchaSpeed    = 1.6
 	captchaFeather  = 0.0
-	captchaStroke   = 6
+	captchaStroke   = 3
 )
 
 var boldFontPaths = []string{
@@ -251,6 +251,7 @@ func CreateTextMask(text string, width, height, scale, spacing int) []byte {
 // GenerateMotionFrames builds a compact captcha video: digits stay centered
 // while background noise slides horizontally and text-region noise slides vertically.
 func GenerateMotionFrames(code string, defenseLevel string, appearance Appearance) *MotionCaptcha {
+	appearance = normalizeAppearance(appearance)
 	width := captchaWidth
 	height := captchaHeight
 	grain := captchaGrain
@@ -334,6 +335,13 @@ func GenerateMotionFrames(code string, defenseLevel string, appearance Appearanc
 		out.FrameCount = len(frames)
 	}
 	return out
+}
+
+func normalizeAppearance(appearance Appearance) Appearance {
+	if len(appearance.Palette) < 2 {
+		return ParseAppearance(nil, appearance.Texture)
+	}
+	return appearance
 }
 
 func makeGrayscaleNoise(rng *rand.Rand, height, width, grain int) []float32 {
@@ -421,7 +429,7 @@ func rgbToRGBA(rgb []byte, width, height int) []byte {
 
 func renderSoftTextMask(text string, width, height int, feather float64) []float32 {
 	mask := make([]float32, width*height)
-	preferred := int(float64(height) * 0.96)
+	preferred := int(float64(height) * 0.98)
 	if face, size := fitBoldFace(text, width, height, preferred); face != nil {
 		img := image.NewGray(image.Rect(0, 0, width, height))
 		draw.Draw(img, img.Bounds(), image.Black, image.Point{}, draw.Src)
@@ -453,8 +461,8 @@ func renderSoftTextMask(text string, width, height int, feather float64) []float
 }
 
 func fitBoldFace(text string, width, height, preferred int) (font.Face, int) {
-	maxW := int(float64(width) * 0.96)
-	maxH := int(float64(height) * 0.94)
+	maxW := int(float64(width) * 0.98)
+	maxH := int(float64(height) * 0.96)
 	for size := preferred; size >= 28; size -= 4 {
 		face := loadBoldFace(float64(size))
 		if face == nil {

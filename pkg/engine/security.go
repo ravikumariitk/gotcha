@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	secretKey      = []byte("gotcha_super_secret_go_salt_" + strconv.FormatInt(time.Now().UnixNano(), 36))
+	secretKey      []byte
 	tokenTTL       = 3 * time.Minute
 	activeMu       sync.RWMutex
 	activeTokens   = make(map[string]*ChallengeRecord)
@@ -32,6 +32,9 @@ type ChallengeRecord struct {
 
 // GenerateRandomCode returns a cryptographically secure N-digit number string
 func GenerateRandomCode(length int) string {
+	if length <= 0 {
+		length = 5
+	}
 	digits := "0123456789"
 	b := make([]byte, length)
 	for i := 0; i < length; i++ {
@@ -44,20 +47,23 @@ func GenerateRandomCode(length int) string {
 // IssueChallenge creates an HMAC signed token with expiration and anti-replay state
 func IssueChallenge(code string) (challengeID string, token string, expiresAt int64) {
 	randBytes := make([]byte, 12)
-	rand.Read(randBytes)
+	if _, err := rand.Read(randBytes); err != nil {
+		return "", "", 0
+	}
 	challengeID = "ch_" + hex.EncodeToString(randBytes)
 
 	now := time.Now().UnixMilli()
 	expiresAt = now + tokenTTL.Milliseconds()
 
 	// Hash answer with challengeID and timestamp
-	h := hmac.New(sha256.New, secretKey)
+	secret := configuredSecret()
+	h := hmac.New(sha256.New, secret)
 	h.Write([]byte(fmt.Sprintf("%s:%s:%d", code, challengeID, now)))
 	answerHash := hex.EncodeToString(h.Sum(nil))
 
 	// Payload & Signature
 	payload := fmt.Sprintf("%s.%d.%d.%s", challengeID, now, expiresAt, answerHash)
-	sigH := hmac.New(sha256.New, secretKey)
+	sigH := hmac.New(sha256.New, secret)
 	sigH.Write([]byte(payload))
 	signature := hex.EncodeToString(sigH.Sum(nil))
 
@@ -93,12 +99,16 @@ func VerifyAnswer(token string, userAnswer string) (bool, int64, error) {
 	sig := parts[4]
 
 	now := time.Now().UnixMilli()
-	ts, _ := strconv.ParseInt(tsStr, 10, 64)
-	exp, _ := strconv.ParseInt(expStr, 10, 64)
+	ts, tsErr := strconv.ParseInt(tsStr, 10, 64)
+	exp, expErr := strconv.ParseInt(expStr, 10, 64)
+	if tsErr != nil || expErr != nil {
+		return false, 0, errors.New("malformed token timestamps")
+	}
 
 	// 1. Signature check
 	payload := fmt.Sprintf("%s.%s.%s.%s", challengeID, tsStr, expStr, expectedHash)
-	sigH := hmac.New(sha256.New, secretKey)
+	secret := configuredSecret()
+	sigH := hmac.New(sha256.New, secret)
 	sigH.Write([]byte(payload))
 	expectedSig := hex.EncodeToString(sigH.Sum(nil))
 
@@ -140,7 +150,7 @@ func VerifyAnswer(token string, userAnswer string) (bool, int64, error) {
 
 	// 5. Answer hash check
 	cleanAnswer := strings.TrimSpace(userAnswer)
-	ansH := hmac.New(sha256.New, secretKey)
+	ansH := hmac.New(sha256.New, secret)
 	ansH.Write([]byte(fmt.Sprintf("%s:%s:%d", cleanAnswer, challengeID, ts)))
 	computedHash := hex.EncodeToString(ansH.Sum(nil))
 
@@ -160,7 +170,7 @@ func VerifyAnswer(token string, userAnswer string) (bool, int64, error) {
 }
 
 func init() {
-	// Cleanup background goroutine
+	ConfigureSecret("")
 	go func() {
 		ticker := time.NewTicker(1 * time.Minute)
 		for range ticker.C {
@@ -180,4 +190,21 @@ func init() {
 			consumedMu.Unlock()
 		}
 	}()
+}
+
+// ConfigureSecret sets the HMAC signing key from env (32+ chars recommended). Empty uses a dev-only default.
+func ConfigureSecret(raw string) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		raw = "gotcha_dev_hmac_change_me_before_production"
+	}
+	activeMu.Lock()
+	secretKey = []byte(raw)
+	activeMu.Unlock()
+}
+
+func configuredSecret() []byte {
+	activeMu.RLock()
+	defer activeMu.RUnlock()
+	return append([]byte(nil), secretKey...)
 }

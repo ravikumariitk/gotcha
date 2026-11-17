@@ -1,56 +1,59 @@
-package main
+package checkhuman
 
 import (
 	"fmt"
 	"testing"
-
-	"checkhuman/pkg/engine"
 )
 
-func TestEngine(t *testing.T) {
-	fmt.Println("🧪 Testing Go GOTCHA Engine...")
+func TestLibraryAPI(t *testing.T) {
+	fmt.Println("🧪 Testing Go library API...")
 
-	// 1. Random code
-	code := engine.GenerateRandomCode(5)
+	code := GenerateCode(5)
 	if len(code) != 5 {
 		t.Fatalf("Expected 5 digits, got %d", len(code))
 	}
 	fmt.Println("✅ Random code generated:", code)
 
-	// 2. Challenge issue and verification
-	cid, token, _ := engine.IssueChallenge("95821")
+	cid, token, _ := IssueCode("95821")
 	if cid == "" || token == "" {
 		t.Fatalf("Failed to issue challenge")
 	}
 
-	// 2a. Wrong answer fails
-	valid, _, err := engine.VerifyAnswer(token, "00000")
+	valid, _, err := VerifyCode(token, "00000")
 	if valid {
 		t.Fatalf("Expected wrong answer to fail, but succeeded")
 	}
 	fmt.Println("✅ Wrong answer rejected properly:", err)
 
-	// 2b. Correct answer succeeds
-	valid, lat, err := engine.VerifyAnswer(token, "95821")
+	valid, lat, err := VerifyCode(token, "95821")
 	if !valid || err != nil {
 		t.Fatalf("Expected correct answer to pass, got err: %v", err)
 	}
 	fmt.Printf("✅ Correct answer passed with latency %dms\n", lat)
 
-	// 2c. Anti-replay fails on second try
-	valid, _, err = engine.VerifyAnswer(token, "95821")
+	valid, _, err = VerifyCode(token, "95821")
 	if valid {
 		t.Fatalf("Expected replay attack to fail, but passed")
 	}
 	fmt.Println("✅ Anti-replay verified:", err)
+}
 
-	// 3. Motion frames generation (GOTCHA version 1 style MP4)
-	motion := engine.GenerateMotionFrames("12345", "standard", engine.ParseAppearance(nil, "noise"))
-	if motion.Video == "" && len(motion.Frames) == 0 {
-		t.Fatalf("Expected video or frames from motion generator")
+func TestNewChallengeIncludesMotionWithoutLeakingAnswer(t *testing.T) {
+	challenge := NewChallenge(5, "standard", ParseAppearance([]string{"#0ea5e9", "#f8fafc"}, "noise"))
+	if challenge == nil || challenge.ID == "" || challenge.Token == "" {
+		t.Fatal("expected a signed challenge")
 	}
-	if motion.Width != 960 || motion.Height != 400 {
-		t.Fatalf("Expected 960x400, got %dx%d", motion.Width, motion.Height)
+	if challenge.Motion == nil || challenge.Motion.Width == 0 || challenge.Motion.Poster == "" {
+		t.Fatal("expected a browser-ready motion challenge")
 	}
-	fmt.Printf("✅ Motion generator synthesized %d frames (video=%t)\n", motion.FrameCount, motion.Video != "")
+	if challenge.ExpiresAt <= 0 {
+		t.Fatal("expected an expiry timestamp")
+	}
+}
+
+func TestRenderMotionUsesDefaultsForZeroAppearance(t *testing.T) {
+	motion := RenderMotion("12345", "standard", Appearance{})
+	if motion == nil || motion.Poster == "" {
+		t.Fatal("expected rendering with a zero-value appearance")
+	}
 }
