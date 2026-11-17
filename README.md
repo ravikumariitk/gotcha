@@ -4,6 +4,13 @@
 It creates signed, expiring challenge tokens, renders browser-ready media, and
 rejects incorrect, expired, or replayed answers.
 
+## Reference
+
+The motion-noise CAPTCHA concept is related to
+[DrMikeMaik/GOTCHA](https://github.com/DrMikeMaik/GOTCHA). That repository
+explores motion-based human-versus-algorithm challenges and includes research
+notes and attack experiments. This project is a separate Go implementation.
+
 ## Install
 
 ```bash
