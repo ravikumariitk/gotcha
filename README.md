@@ -129,7 +129,8 @@ in minimal environments.
 - Keep the token in memory or in a protected form field on the client.
 - Tokens expire after three minutes.
 - Tokens are single-use and rejected after successful verification.
-- A challenge is invalidated after five failed attempts.
+- A challenge allows at most five submissions and is invalidated after the
+  fifth failed attempt.
 - Always configure `GOTCHA_SECRET` in production with a long, random value.
 - If no secret is configured, Gotcha uses a development-only fallback secret;
   never rely on that fallback in production.

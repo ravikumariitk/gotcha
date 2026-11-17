@@ -57,3 +57,21 @@ func TestRenderMotionUsesDefaultsForZeroAppearance(t *testing.T) {
 		t.Fatal("expected rendering with a zero-value appearance")
 	}
 }
+
+func TestChallengeStopsAfterFiveFailedAttempts(t *testing.T) {
+	_, token, _ := IssueCode("95821")
+	for attempt := 1; attempt <= 5; attempt++ {
+		valid, _, err := VerifyCode(token, "00000")
+		if valid {
+			t.Fatalf("attempt %d unexpectedly succeeded", attempt)
+		}
+		if attempt < 5 && err == nil {
+			t.Fatalf("attempt %d should return an error", attempt)
+		}
+	}
+
+	valid, _, err := VerifyCode(token, "95821")
+	if valid || err == nil {
+		t.Fatal("expected a challenge exhausted after five failed attempts")
+	}
+}

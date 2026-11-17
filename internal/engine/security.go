@@ -138,14 +138,7 @@ func VerifyAnswer(token string, userAnswer string) (bool, int64, error) {
 	}
 
 	record.Attempts++
-	if record.Attempts > 5 {
-		delete(activeTokens, challengeID)
-		activeMu.Unlock()
-		consumedMu.Lock()
-		consumedTokens[token] = true
-		consumedMu.Unlock()
-		return false, 0, errors.New("too many attempts for this challenge")
-	}
+	attemptsExhausted := record.Attempts >= 5
 	activeMu.Unlock()
 
 	// 5. Answer hash check
@@ -164,6 +157,17 @@ func VerifyAnswer(token string, userAnswer string) (bool, int64, error) {
 		consumedMu.Unlock()
 
 		return true, now - ts, nil
+	}
+
+	if attemptsExhausted {
+		activeMu.Lock()
+		delete(activeTokens, challengeID)
+		activeMu.Unlock()
+
+		consumedMu.Lock()
+		consumedTokens[token] = true
+		consumedMu.Unlock()
+		return false, 0, errors.New("too many attempts for this challenge")
 	}
 
 	return false, 0, errors.New("incorrect code. Watch the motion carefully or replay")
