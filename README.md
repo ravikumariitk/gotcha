@@ -11,6 +11,8 @@ rejects incorrect, expired, or replayed answers.
 go get github.com/ravikumariitk/gotcha
 ```
 
+Gotcha currently targets Go 1.26.0 or newer.
+
 ## Usage
 
 ```go
@@ -135,6 +137,18 @@ in minimal environments.
 - Always configure `GOTCHA_SECRET` in production with a long, random value.
 - If no secret is configured, Gotcha uses a development-only fallback secret;
   never rely on that fallback in production.
+
+## Operational limitations
+
+- Gotcha does not provide rate limiting, account lockout, MFA, sessions, or
+  user authentication. Add those controls in the consuming application.
+- Challenge state is stored in process memory. A process restart invalidates
+  outstanding challenges, and multiple application instances need shared state
+  or request affinity if challenges may be verified by a different instance.
+- The token is signed but not encrypted. Do not put private application data in
+  it or treat possession of it as proof of identity.
+- A CAPTCHA is an abuse-friction layer, not a guarantee that a request came
+  from a human or a defense against determined automation.
 
 ## API reference
 
