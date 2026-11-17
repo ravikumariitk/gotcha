@@ -135,13 +135,186 @@ in minimal environments.
 - If no secret is configured, Gotcha uses a development-only fallback secret;
   never rely on that fallback in production.
 
-## API
+## API reference
 
-- `ConfigureSecret(string)` configures the signing secret.
-- `NewChallenge(int, string, Appearance) *Challenge` creates a challenge.
-- `RenderMotion(string, string, Appearance) *MotionCaptcha` renders media.
-- `VerifyCode(string, string) (bool, int64, error)` verifies an answer.
-- `ParseAppearance([]string, string) Appearance` validates presentation options.
+Gotcha provides challenge generation, motion-media rendering, signed
+verification, expiration, replay protection, and attempt limiting. It does not
+provide HTTP routing, user storage, sessions, or authentication.
+
+### `ConfigureSecret`
+
+```go
+func ConfigureSecret(raw string)
+```
+
+Sets the process-wide HMAC signing key.
+
+- `raw`: long, random signing key. Load it from `GOTCHA_SECRET` in production.
+  An empty value selects the development-only fallback key. Call this once at
+  startup before creating or verifying challenges.
+- Returns: nothing.
+
+### `GenerateCode`
+
+```go
+func GenerateCode(length int) string
+```
+
+Generates a cryptographically secure numeric answer.
+
+- `length`: number of digits. Values `<= 0` use `5`.
+- Returns: numeric answer string. `NewChallenge` never exposes this answer.
+
+### `IssueCode`
+
+```go
+func IssueCode(code string) (challengeID string, token string, expiresAt int64)
+```
+
+Creates signed challenge state without rendering media.
+
+- `code`: answer to protect. If empty, a new five-digit code is generated. The
+  caller must retain the answer if it plans to verify this challenge.
+- `challengeID`: random identifier beginning with `ch_`.
+- `token`: signed value required by `VerifyCode`; do not log it.
+- `expiresAt`: expiration time as Unix milliseconds. Tokens currently expire
+  after three minutes.
+
+### `NewChallenge`
+
+```go
+func NewChallenge(length int, defenseLevel string, appearance Appearance) *Challenge
+```
+
+Generates an answer, signs it, and renders a complete browser-ready challenge.
+
+- `length`: numeric answer length; `<= 0` uses `5`.
+- `defenseLevel`: `"standard"` for default motion or `"ultra"` for faster
+  foreground motion. Other values currently behave as standard.
+- `appearance`: palette and texture configuration, normally created with
+  `ParseAppearance`.
+- Returns: `*Challenge` containing token, expiry, and media. The answer is
+  never returned.
+
+### `RenderMotion`
+
+```go
+func RenderMotion(code string, defenseLevel string, appearance Appearance) *MotionCaptcha
+```
+
+Renders media without creating a token.
+
+- `code`: text rendered into the challenge; callers should use digits.
+- `defenseLevel`: `"standard"` or `"ultra"`; unknown values use standard.
+- `appearance`: validated palette and texture configuration.
+- Returns: `*MotionCaptcha` with a poster and either MP4 or PNG frames.
+
+### `VerifyCode`
+
+```go
+func VerifyCode(token string, answer string) (valid bool, latency int64, err error)
+```
+
+Validates an answer against a signed token.
+
+- `token`: exact token returned by `NewChallenge` or `IssueCode`.
+- `answer`: user-entered answer. Leading and trailing whitespace is trimmed.
+- `valid`: `true` only for a correct, unexpired, unconsumed challenge.
+- `latency`: milliseconds from challenge creation to successful verification;
+  `0` on failure.
+- `err`: `nil` on success. Errors cover missing input, malformed or tampered
+  tokens, expiration, replay, missing state, incorrect answers, and exhaustion.
+
+Verification rules:
+
+- Tokens expire after three minutes.
+- Successful tokens are single-use.
+- A challenge allows at most five submissions; the fifth failed submission
+  exhausts it.
+- The expected answer is never included in an error.
+
+### `ParseAppearance`
+
+```go
+func ParseAppearance(colors []string, texture string) Appearance
+```
+
+Builds a validated rendering configuration.
+
+- `colors`: CSS-style six-digit hexadecimal colors, with or without `#`. The
+  first valid color is the dark/background color; later valid colors are
+  highlights. At least two valid colors are required to replace defaults.
+- `texture`: `"noise"`, `"dots"`, `"diagonal"`, `"grid"`, or `"waves"`.
+  Unsupported values use `"noise"`.
+- Returns: `Appearance`; invalid colors are ignored and insufficient palettes
+  use the default black-and-white palette.
+
+### `Appearance`
+
+```go
+type Appearance struct {
+    Palette [][3]byte
+    Texture string
+}
+```
+
+- `Palette`: RGB colors, with the first used for the dark/background region.
+- `Texture`: supported texture name. Zero-value or invalid settings are
+  normalized safely during rendering.
+
+### `Challenge`
+
+```go
+type Challenge struct {
+    ID        string         `json:"id"`
+    Token     string         `json:"token"`
+    ExpiresAt int64          `json:"expiresAt"`
+    Motion    *MotionCaptcha `json:"motion,omitempty"`
+}
+```
+
+- `ID`: unique challenge identifier.
+- `Token`: signed value submitted to `VerifyCode`.
+- `ExpiresAt`: Unix expiration timestamp in milliseconds.
+- `Motion`: browser media and metadata.
+
+### `MotionCaptcha`
+
+```go
+type MotionCaptcha struct {
+    Width      int      `json:"width"`
+    Height     int      `json:"height"`
+    FrameCount int      `json:"frameCount"`
+    FPS        int      `json:"fps"`
+    GrainSize  int      `json:"grainSize"`
+    Mime       string   `json:"mime,omitempty"`
+    Video      string   `json:"video,omitempty"`
+    Poster     string   `json:"poster,omitempty"`
+    Frames     []string `json:"frames,omitempty"`
+}
+```
+
+- `Width`, `Height`: media dimensions in pixels; defaults are `480 x 160`.
+- `FrameCount`: number of animation frames.
+- `FPS`: playback rate in frames per second.
+- `GrainSize`: renderer grain size.
+- `Mime`: media type, normally `"video/mp4"` when `Video` exists.
+- `Video`: base64-encoded MP4 when `ffmpeg` is available and succeeds.
+- `Poster`: base64-encoded PNG poster for the first frame.
+- `Frames`: base64-encoded PNG fallback frames when MP4 is unavailable.
+
+### HTTP integration contract
+
+Gotcha leaves routing and response codes to the importing application. A
+typical integration exposes `GET /challenge`, returns a `Challenge` as JSON,
+then accepts `POST /verify` with:
+
+```json
+{"token":"...", "answer":"..."}
+```
+
+Call `VerifyCode` on the server and return application success only when
+`valid == true`. Never return the answer code or the HMAC secret.
 
 ## AI and crawler resistance
 
